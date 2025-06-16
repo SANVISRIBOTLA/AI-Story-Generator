@@ -1,0 +1,100 @@
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+// Your Gemini API key
+const GEMINI_API_KEY = "AIzaSyCwkw2sFgvY0Xz0vDG9pwIgD6kl_CPjskY";
+
+const generateStoryBtn = document.getElementById("generate-story-btn");
+generateStoryBtn.addEventListener("click", generateStory);
+
+const storyInput = document.getElementById("story-input");
+storyInput.addEventListener("focus", handleTextAreaFocus);
+storyInput.addEventListener("blur", handleTextAreaBlur);
+
+const listenBtn = document.getElementById("listen-btn");
+const pauseBtn = document.getElementById("pause-btn");
+const resumeBtn = document.getElementById("resume-btn");
+
+let speechSynthesisUtterance;
+
+// ✅ Prompt validation function
+function validatePrompt(prompt) {
+  const lowerPrompt = prompt.toLowerCase();
+  const keywords = ["story", "tale", "once", "adventure", "magic", "dragon", "character", "journey", "castle", "witch", "robot", "king","princess", "greedy", "queen", "beast", "beauty", "abandon", "kidnap", "misery", "poet","dancer"];
+  const minWords = 5;
+  return prompt.split(" ").length >= minWords && keywords.some(word => lowerPrompt.includes(word));
+}
+
+async function generateStory() {
+  const promptText = storyInput.value.trim();
+  const theme = document.getElementById("story-theme").value;
+  const length = document.getElementById("story-length").value;
+  const tone = document.getElementById("story-tone").value;
+  const characterName = document.getElementById("character-name").value.trim();
+
+  if (!promptText) {
+    displayError("Please enter a story prompt.");
+    return;
+  }
+
+  if (!validatePrompt(promptText)) {
+    displayError("Prompt not valid for story generation. Try something like: 'A robot lost in the desert finds a talking cactus.'");
+    return;
+  }
+
+  const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+  const spinner = document.getElementById("spinner");
+  spinner.style.display = "flex";
+
+  const composedPrompt = `
+You are a storytelling assistant. Only generate a fictional story based on the following idea.
+If the prompt is not a story idea, respond with: "Sorry, I can only write fictional stories."
+
+Write a ${theme} story with a ${tone} tone about ${characterName ? characterName : "a main character"}. Story idea: ${promptText}.`
+;
+
+  try {
+    const result = await model.generateContent(composedPrompt);
+    const response = await result.response;
+    let story = await response.text();
+    story = story.replace(/\*/g, "").replace(/(?:\r\n|\r|\n)/g, "<br />");
+    displayStory(story);
+  } catch (error) {
+    console.error("Error generating story:", error);
+    displayError("Sorry, something went wrong while generating your story.");
+  } finally {
+    spinner.style.display = "none";
+  }
+}
+
+function displayStory(story) {
+  const generatedContent = document.getElementById("generated-content");
+  generatedContent.innerHTML = `<p>${story}</p><hr />`;
+}
+
+function displayError(message) {
+  const generatedContent = document.getElementById("generated-content");
+  generatedContent.innerHTML = `<p class="error red-text">${message}</p>`;
+}
+
+function handleTextAreaFocus() {
+  storyInput.style.borderColor = "purple";
+  storyInput.style.height = "120px";
+}
+
+function handleTextAreaBlur() {
+  storyInput.style.borderColor = "";
+  storyInput.style.height = "";
+}
+document.getElementById("listen-btn").addEventListener("click", function() {
+  const story = document.getElementById("generated-content").innerText;
+  speakStory(story);
+});
+
+// Function to handle text-to-speech
+function speakStory(storyText) {
+  const utterance = new SpeechSynthesisUtterance(storyText);
+  utterance.voice = speechSynthesis.getVoices().find(voice => voice.lang === "en-US");
+  speechSynthesis.speak(utterance);
+}

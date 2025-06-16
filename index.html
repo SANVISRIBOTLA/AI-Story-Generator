@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>AI Story Generator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;600&display=swap" rel="stylesheet" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet" />
+  <link href="style.css" rel="stylesheet" />
+  <style>
+    body { padding: 20px; }
+    #generated-content { margin-top: 30px; }
+    .red-text { color: red; }
+  </style>
+</head>
+<body>
+    <div class="header">
+    <h1>AI Story Generator</h1>
+    <h2 class="subtitle">Where Imagination Comes to Life</h2>
+    </div>
+
+
+  <div class="input-field">
+    <input id="story-input" type="text" placeholder="Enter a story idea">
+  </div>
+  <div class="input-field">
+    <input id="character-name" type="text" placeholder="Main character name">
+  </div>
+  <div class="input-field">
+    <select id="story-theme">
+      <option value="fantasy" selected>Fantasy</option>
+      <option value="sci-fi">Sci-Fi</option>
+      <option value="mystery">Mystery</option>
+      <option value="adventure">Adventure</option>
+      <option value="romance">Romance</option>
+    </select>
+    <label>Story Theme</label>
+  </div>
+  <div class="input-field">
+    <select id="story-tone">
+      <option value="lighthearted" selected>Lighthearted</option>
+      <option value="dark">Dark</option>
+      <option value="inspirational">Inspirational</option>
+    </select>
+    <label>Story Tone</label>
+  </div>
+  <div class="input-field">
+    <select id="story-length">
+      <option value="150" selected>Short (150 words)</option>
+      <option value="300">Medium (300 words)</option>
+      <option value="500">Long (500 words)</option>
+    </select>
+    <label>Story Length</label>
+  </div>
+
+  <button id="generate-story-btn" class="btn green">Generate Story</button>
+  <button id="download-pdf-btn" class="btn blue" style="display:none;">Read Aloud</button>
+  <button id="stop-btn" class="btn red" style="display:none;">Stop</button>
+
+  <div id="prompt-preview" class="grey-text"></div>
+  <div id="generated-content"></div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      M.AutoInit();  // Initialize Materialize selects
+    });
+
+    let utterance; // Global variable for speech
+
+    document.getElementById("generate-story-btn").addEventListener("click", generateStory);
+    document.getElementById("download-pdf-btn").addEventListener("click", readStoryAloud);
+    document.getElementById("stop-btn").addEventListener("click", stopSpeech);
+
+    
+    // ✅ Prompt validation function
+    function validatePrompt(prompt) {
+      const lowerPrompt = prompt.toLowerCase();
+      const keywords = ["story", "tale", "once", "adventure", "magic", "dragon", "character",
+       "journey", "castle", "witch", "robot", "king","princess", "greedy", "queen", "beast", "beauty",
+        "abandon", "kidnap", "misery", "poet","dancer","cat","dog","camel","grumpy","bubbly","village",
+      "woman","man","missing","abandoned","student","professor","librarian","chef","musician","drum","soldier",
+    "army","enemy","night","cursed","boy","girl"];
+      const minWords = 5;
+      return prompt.split(" ").length >= minWords && keywords.some(word => lowerPrompt.includes(word));
+    }
+        function updateBackground(theme) {
+      const body = document.body;
+      switch (theme) {
+        case "fantasy":
+          body.style.backgroundImage = "url('images/fantasy.jpeg')";
+          break;
+        case "sci-fi":
+          body.style.backgroundImage = "url('images/scifi.jpeg')";
+          break;
+        case "mystery":
+          body.style.backgroundImage = "url('images/mystery.jpeg')";
+          break;
+        case "adventure":
+          body.style.backgroundImage = "url('images/adventure.jpeg')";
+          break;
+        case "romance":
+          body.style.backgroundImage = "url('images/romance.jpeg')"
+        default:
+          body.style.backgroundImage = "none";
+      }
+    }
+
+
+    async function generateStory() {
+      const promptText = document.getElementById("story-input").value.trim();
+      const theme = document.getElementById("story-theme").value;
+      const tone = document.getElementById("story-tone").value;
+      const characterName = document.getElementById("character-name").value.trim();
+      const length = document.getElementById("story-length").value;
+
+      if (!promptText) {
+        return displayError("Please enter a story prompt.");
+      }
+
+      if (promptText.length < 10) {
+        return displayError("Prompt is too short. Please write a more detailed story idea.");
+      }
+      
+
+      if (!validatePrompt(promptText)) {
+        displayError("Prompt not valid for story generation. Try something like: 'A robot lost in the desert finds a talking cactus.'");
+        return;
+      }
+      updateBackground(theme);
+
+      const composedPrompt = `You are a creative story generator. Write a ${theme} story of approximately ${length} words with a ${tone} tone. The main character's name is ${characterName}. Story idea: ${promptText}`;
+
+      try {
+        const res = await fetch("http://localhost:5000/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: composedPrompt })
+        });
+
+        const data = await res.json();
+
+        if (data.story) {
+          displayStory(data.story);
+        } else {
+          displayError("Failed to generate story.");
+        }
+      } catch (err) {
+        console.error(err);
+        displayError("Sorry, something went wrong while generating your story.");
+      }
+    }
+
+    function displayStory(story) {
+      const contentDiv = document.getElementById("generated-content");
+      contentDiv.innerHTML = `<p>${story}</p><button onclick="continueStory()" class="btn blue">Continue Story</button>`;
+      document.getElementById("download-pdf-btn").style.display = "inline-block";
+    }
+
+    function continueStory() {
+      const newPrompt = prompt("Continue the story from here:");
+      if (newPrompt) {
+        document.getElementById("story-input").value = newPrompt;
+        generateStory();
+      }
+    }
+
+    function readStoryAloud() {
+      const storyText = document.getElementById("generated-content").innerText;
+      if (!storyText) return;
+
+      utterance = new SpeechSynthesisUtterance(storyText);
+      window.speechSynthesis.cancel(); // Clear previous speech
+      window.speechSynthesis.speak(utterance);
+
+      document.getElementById("stop-btn").style.display = "inline-block";
+
+      // Hide Stop button when speech ends
+      utterance.onend = () => {
+        document.getElementById("stop-btn").style.display = "none";
+      };
+    }
+
+    function stopSpeech() {
+      if (window.speechSynthesis.speaking || window.speechSynthesis.paused) {
+        window.speechSynthesis.cancel();
+        document.getElementById("stop-btn").style.display = "none";
+      }
+    }
+
+    function displayError(msg) {
+      document.getElementById("generated-content").innerHTML = `<p class="red-text">${msg}</p>`;
+      document.getElementById("download-pdf-btn").style.display = "none";
+      document.getElementById("stop-btn").style.display = "none";
+    }
+  </script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+</body>
+</html>
