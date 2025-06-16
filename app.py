@@ -6,7 +6,7 @@ app = Flask(__name__)
 CORS(app)  # Allow requests from frontend
 
 # Securely set your Gemini API key here
-genai.configure(api_key="AIzaSyBA6-x6WeEnm1G4YpMeoKZzEp4poP9NW9E")
+genai.configure(api_key="gemini key")
 
 @app.route("/generate", methods=["POST"])
 def generate():
